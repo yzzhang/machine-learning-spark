@@ -1,0 +1,9 @@
+# /Users/yuhuang/yuefeng/machine-learning-spark/interview_attendance_problem/MLproject
+
+name: interview_attendance_problem
+
+conda_env: conda.yaml
+
+entry_points:
+  main:
+    command: "python interview_attendance_koalas.py"
