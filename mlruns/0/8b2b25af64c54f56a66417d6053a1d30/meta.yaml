@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/yuhuang/yuefeng/machine-learning-spark/mlruns/0/8b2b25af64c54f56a66417d6053a1d30/artifacts
+end_time: 1571980644887
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+name: ''
+run_id: 8b2b25af64c54f56a66417d6053a1d30
+run_uuid: 8b2b25af64c54f56a66417d6053a1d30
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1571980630806
+status: 3
+tags: []
+user_id: yuhuang
