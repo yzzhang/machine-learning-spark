@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 from   datetime import datetime
 import os
+import subprocess
 import requests
 import json
 
@@ -646,7 +647,10 @@ if __name__ == "__main__":
     # start model Web service
     # Note that the model unique universal ID b6e8b1936c44400bb973a13cc40a9b8f needs to be modified to match your case
     #
-    mlflow models serve -m /Users/yuhuang/yuefeng/machine-learning-spark/mlruns/0/b6e8b1936c44400bb973a13cc40a9b8f/artifacts/random_forest_model -p 1234
+    print('start model Web service ...')
+    cmd = "mlflow models serve -m /Users/yuhuang/yuefeng/machine-learning-spark/mlruns/0/b6e8b1936c44400bb973a13cc40a9b8f/artifacts/random_forest_model -p 1234"
+    returned_value = os.system(cmd) 
+    print('model Web service started')
     
     #
     # call model Web service
