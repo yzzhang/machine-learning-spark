@@ -4,7 +4,7 @@
 
 In the article [Python Data Preprocessing Using Pandas DataFrame, Spark DataFrame, and Koalas DataFrame](https://towardsdatascience.com/python-data-preprocessing-using-pandas-dataframe-spark-dataframe-and-koalas-dataframe-e44c42258a8f), I used a public dataset to evaluate and compare the basic functionality of Pandas, Spark, and Koalas DataFrames in typical data preprocessing steps for machine learning. 
 
-In this article, I use the [Interview Attendance Problem for Kaggle competition](https://www.kaggle.com/vishnusraghavan/the-interview-attendance-problem) to demonstrate an end-to-end process of developing a machine learning pipeline for both Pandas and Koalas dataframes using Pandas, Koalas, Scikit-Learn, and mlflow. This is achieved by:
+In the article [Object-Oriented Machine Learning Pipeline with mlflow for Pandas and Koalas DataFrames](https://towardsdatascience.com/object-oriented-machine-learning-pipeline-with-mlflow-for-pandas-and-koalas-dataframes-ef8517d39a12), I use the [Interview Attendance Problem for Kaggle competition](https://www.kaggle.com/vishnusraghavan/the-interview-attendance-problem) to demonstrate an end-to-end process of developing a machine learning pipeline for both Pandas and Koalas dataframes using Pandas, Koalas, Scikit-Learn, and mlflow. This is achieved by:
 * Developing a scikit-learn data preprocessing pipeline using Pandas with scikit-learn
 * Developing a scikit-learn data preprocessing pipeline for Spark by combining scikit-learn with Koalas
 * Developing a machine learning pipeline by combining scikit-learn with mlflow
