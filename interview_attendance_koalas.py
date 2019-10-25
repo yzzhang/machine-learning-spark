@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 from   datetime import datetime
 import os
+import requests
+import json
 
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.pipeline import Pipeline
@@ -22,6 +24,8 @@ from sklearn.metrics import accuracy_score
 from sklearn.metrics import f1_score
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
+ks_df = ks.read_csv('Interview_Attendance_Data.csv')
+
 def transformColumn(column_values, func, func_type):
     '''
     This function is to transform a given column (column_values) of a Koalas DataFrame or Series.
@@ -38,77 +42,83 @@ def transformColumn(column_values, func, func_type):
             
     return cvalues
 
-class OneHotEncodeData(BaseEstimator, TransformerMixin):
+class BucketSkillset(BaseEstimator, TransformerMixin):
     def __init__(self):
         '''
-        This class is to one-hot encode the categorical features.
+        This class is to re-bucket the skill sets and candidates location features 
+        to combine small catogaries into one catogary 'Others'.
         '''
-        self.one_hot_feature_names = ['Client name', 
-                        'Industry', 
-                        'Location', 
-                        'Position to be closed', 
-                        'Nature of Skillset',
-                        'Interview Type', 
-                        #'Name(Cand ID)', 
-                        'Gender', 
-                        'Candidate Current Location',
-                        'Candidate Job Location', 
-                        'Interview Venue', 
-                        'Candidate Native location',
-                        'Have you obtained the necessary permission to start at the required time',
-                        'Hope there will be no unscheduled meetings',
-                        'Can I Call you three hours before the interview and follow up on your attendance for the interview',
-                        'Can I have an alternative number/ desk number. I assure you that I will not trouble you too much',
-                        'Have you taken a printout of your updated resume. Have you read the JD and understood the same',
-                        'Are you clear with the venue details and the landmark.',
-                        'Has the call letter been shared', 
-                        'Marital Status']
-        self.label_encoders   = None
-        self.one_hot_encoders = None
-        
-    def fit(self, X, y=None):       
-        return self
-    
-    def transform(self, X, y=None):  
-        X1 = X.copy()
-        X1 = ks.get_dummies(X1)
-        return X1
-    
-class FeaturesUppercase(BaseEstimator, TransformerMixin):
-    def __init__(self, feature_names, drop_feature_names):
-        '''
-        This class is to change feature values to uppercase.
-        '''
-        self.feature_names      = feature_names
-        self.drop_feature_names = drop_feature_names
+        self.skillset = ['JAVA/J2EE/Struts/Hibernate', 'Fresher', 'Accounting Operations', 'CDD KYC', 'Routine', 'Oracle', 
+          'JAVA/SPRING/HIBERNATE/JSF', 'Java J2EE', 'SAS', 'Oracle Plsql', 'Java Developer', 
+          'Lending and Liabilities', 'Banking Operations', 'Java', 'Core Java', 'Java J2ee', 'T-24 developer', 
+          'Senior software engineer-Mednet', 'ALS Testing', 'SCCM', 'COTS Developer', 'Analytical R & D', 
+          'Sr Automation Testing', 'Regulatory', 'Hadoop', 'testing', 'Java', 'ETL', 'Publishing']       
     
     def fit(self, X, y=None):
         return self
-        
+    
     def transform(self, X, y=None):
         '''
-        This method is to change feature values to uppercase.
+        This method is to re-bucket the skill sets features.
         '''
         
-        func = lambda x: x.strip().upper()
+        func = lambda x: x if x in self.skillset else 'Others'
+               
+        X1 = X.copy()
         
-        #def transform_column(column_element) -> str:
-        #    return func(column_element)
+        cname = 'Nature of Skillset'
+        cvalue = X1[cname]
         
-        X_uppercase = X.copy()
-        
-        for fname in self.feature_names:
-            values = X_uppercase[fname]
-            values = values.fillna('NaN')
-            # values = values.apply(transform_column)
-            values = transformColumn(values, func, str)
-            X_uppercase[fname] = values
-        
-        # drop less important features
-        X_uppercase = X_uppercase.drop(self.drop_feature_names, axis=1)
+        if type(X1) == ks.DataFrame:  
+            cvalue = transformColumn(cvalue, func, str)
+            X1[cname] = cvalue
+        elif type(X1) == pd.DataFrame:
+            X2 = map(func, cvalue)
+            X1[cname] = pd.Series(X2)
+        else:
+            print('BucketSkillset: unsupported dataframe: {}'.format(type(X1)))
+            pass
             
-        return X_uppercase   
+        return X1  
     
+class BucketLocation(BaseEstimator, TransformerMixin):
+    def __init__(self):
+        '''
+        This class is to re-bucket the candidates location features 
+        to combine small catogaries into one catogary 'Others'.
+        '''
+        
+        self.candidate_locations = ['Chennai', 'Hyderabad', 'Bangalore', 'Gurgaon', 'Cuttack', 'Cochin', 
+                          'Pune', 'Coimbatore', 'Allahabad', 'Noida', 'Visakapatinam', 'Nagercoil',
+                          'Trivandrum', 'Kolkata', 'Trichy', 'Vellore']
+        
+    
+    def fit(self, X, y=None):
+        return self
+    
+    def transform(self, X, y=None):
+        '''
+        This method is to re-bucket the candidates native locations features.
+        '''
+            
+        X1 = X.copy()
+        
+        func = lambda x: x if x in self.candidate_locations else 'Others'
+        
+        cname = 'Candidate Native location'
+        cvalue = X1[cname]
+        if type(X1) == ks.DataFrame: 
+            cvalue = transformColumn(cvalue, func, str)
+            X1[cname] = cvalue
+        elif type(X1) == pd.DataFrame:
+            X2 = map(func, cvalue)
+            X1[cname] = pd.Series(X2)
+        else:
+            print('BucketLocation: unsupported dataframe: {}'.format(type(X1)))
+            pass
+            
+        return X1
+
 class ParseInterviewDate(BaseEstimator, TransformerMixin):
     def __init__(self):
         '''
@@ -192,82 +202,143 @@ class ParseInterviewDate(BaseEstimator, TransformerMixin):
                 return int(year)
             except:
                 return 0
+            
+        def pandas_transform_date(X1):
+            days = []
+            months = []
+            years = []
+            ditems = X1['Date of Interview'].values
+            for ditem in ditems:
+                if (isinstance(ditem, str) and len(ditem) > 0):
+                    if ('.' in ditem):
+                        d = self.__parseDate(ditem, '.')
+                    elif ('/' in ditem):
+                        d = self.__parseDate(ditem, '/')
+                    elif ('-' in ditem):
+                        d = self.__parseDate(ditem, '-')
+                    elif (' ' in ditem):
+                        d = self.__parseDate(ditem, ' ')
+                    else:
+                        d = None
+                    
+                    if (d is None):
+                        # print("{}, invalid format of interview date!".format(ditem))
+                        days.append(0) # 0 - NaN
+                        months.append(0)
+                        years.append(0)
+                    else:
+                        days.append(d.day) 
+                        months.append(d.month)
+                        years.append(d.year)
+                else:
+                    days.append(0)
+                    months.append(0)
+                    years.append(0)
         
+            X1['Year'] = years
+            X1['Month'] = months
+            X1['Day'] = days
+            
+            return X1
         
         X1 = X.copy()
         
-        X1['Year'] = X1['Date of Interview']
-        X1['Month'] = X1['Date of Interview']
-        X1['Day'] = X1['Date of Interview']
+        if type(X1) == ks.DataFrame: 
+            X1['Year'] = X1['Date of Interview']
+            X1['Month'] = X1['Date of Interview']
+            X1['Day'] = X1['Date of Interview']
         
-        func_map = {'Year' : get_year, 'Month' : get_month, 'Day' : get_day}
-        for cname in func_map:
-            cvalue = X1[cname]
-            cvalue = cvalue.apply(func_map[cname])
-            X1[cname] = cvalue
+            func_map = {'Year' : get_year, 'Month' : get_month, 'Day' : get_day}
+            for cname in func_map:
+                cvalue = X1[cname]
+                cvalue = cvalue.apply(func_map[cname])
+                X1[cname] = cvalue
+        elif type(X1) == pd.DataFrame:
+            X1 = pandas_transform_date(X1)
+        else:
+            print('ParseInterviewDate: unsupported dataframe: {}'.format(type(X1)))
+            pass 
          
-        return X1 
+        return X1  
     
-class BucketSkillset(BaseEstimator, TransformerMixin):
-    def __init__(self):
+class FeaturesUppercase(BaseEstimator, TransformerMixin):
+    def __init__(self, feature_names, drop_feature_names):
         '''
-        This class is to re-bucket the skill sets and candidates location features 
-        to combine small catogaries into one catogary 'Others'.
+        This class is to change feature values to uppercase.
         '''
-        self.skillset = ['JAVA/J2EE/Struts/Hibernate', 'Fresher', 'Accounting Operations', 'CDD KYC', 'Routine', 'Oracle', 
-          'JAVA/SPRING/HIBERNATE/JSF', 'Java J2EE', 'SAS', 'Oracle Plsql', 'Java Developer', 
-          'Lending and Liabilities', 'Banking Operations', 'Java', 'Core Java', 'Java J2ee', 'T-24 developer', 
-          'Senior software engineer-Mednet', 'ALS Testing', 'SCCM', 'COTS Developer', 'Analytical R & D', 
-          'Sr Automation Testing', 'Regulatory', 'Hadoop', 'testing', 'Java', 'ETL', 'Publishing']       
+        self.feature_names      = feature_names
+        self.drop_feature_names = drop_feature_names
     
     def fit(self, X, y=None):
         return self
-    
+        
     def transform(self, X, y=None):
         '''
-        This method is to re-bucket the skill sets features.
+        This method is to change feature values to uppercase.
         '''
-        func = lambda x: x if x in self.skillset else 'Others'
-               
+        
+        func = lambda x: x.strip().upper()
+        
         X1 = X.copy()
         
-        cname = 'Nature of Skillset'
-        cvalue = X1[cname]
-        cvalue = transformColumn(cvalue, func, str)
-        X1[cname] = cvalue
+        for fname in self.feature_names:
+            values = X1[fname]
+            values = values.fillna('NaN')
+            if type(X1) == ks.DataFrame: 
+                values = transformColumn(values, func, str)
+            elif type(X1) == pd.DataFrame:
+                values = map(lambda x: x.strip().upper(), values)
+            else:
+                print('FeaturesUppercase: unsupported dataframe: {}'.format(type(X1)))   
+            X1[fname] = values
             
-        return X1  
+        # drop less important features
+        X1 = X1.drop(self.drop_feature_names, axis=1)
+            
+        return X1
     
-class BucketLocation(BaseEstimator, TransformerMixin):
+class OneHotEncodeData(BaseEstimator, TransformerMixin):
     def __init__(self):
         '''
-        This class is to re-bucket the candidates location features 
-        to combine small catogaries into one catogary 'Others'.
+        This class is to one-hot encode the categorical features.
         '''
+        self.one_hot_feature_names = ['Client name', 
+                        'Industry', 
+                        'Location', 
+                        'Position to be closed', 
+                        'Nature of Skillset',
+                        'Interview Type', 
+                        #'Name(Cand ID)', 
+                        'Gender', 
+                        'Candidate Current Location',
+                        'Candidate Job Location', 
+                        'Interview Venue', 
+                        'Candidate Native location',
+                        'Have you obtained the necessary permission to start at the required time',
+                        'Hope there will be no unscheduled meetings',
+                        'Can I Call you three hours before the interview and follow up on your attendance for the interview',
+                        'Can I have an alternative number/ desk number. I assure you that I will not trouble you too much',
+                        'Have you taken a printout of your updated resume. Have you read the JD and understood the same',
+                        'Are you clear with the venue details and the landmark.',
+                        'Has the call letter been shared', 
+                        'Marital Status']
+        self.label_encoders   = None
+        self.one_hot_encoders = None
         
-        self.candidate_locations = ['Chennai', 'Hyderabad', 'Bangalore', 'Gurgaon', 'Cuttack', 'Cochin', 
-                          'Pune', 'Coimbatore', 'Allahabad', 'Noida', 'Visakapatinam', 'Nagercoil',
-                          'Trivandrum', 'Kolkata', 'Trichy', 'Vellore']
-        
-    
-    def fit(self, X, y=None):
+    def fit(self, X, y=None):       
         return self
     
-    def transform(self, X, y=None):
-        '''
-        This method is to re-bucket the candidates native locations features.
-        '''
-            
+    def transform(self, X, y=None):  
         X1 = X.copy()
+        if type(X1) == ks.DataFrame: 
+            X1 = ks.get_dummies(X1)
+        elif type(X1) == pd.DataFrame:
+            X1 = pd.get_dummies(X1)
+        else:
+            print('OneHotEncodeData: unsupported dataframe: {}'.format(type(X1)))
+            pass
         
-        func = lambda x: x if x in self.candidate_locations else 'Others'
-        
-        cname = 'Candidate Native location'
-        cvalue = X1[cname]
-        cvalue = transformColumn(cvalue, func, str)
-        X1[cname] = cvalue
-            
-        return X1  
+        return X1
     
 class GridSearch(object):
     def __init__(self, cv=10):
@@ -284,15 +355,16 @@ class GridSearch(object):
         
     def fit(self, X, y):
         rfc = RandomForestClassifier()
-        self.gridSearch = GridSearchCV(rfc, self.grid_param, cv=self.cv, scoring=self.scoring_function)
-        self.gridSearch.fit(X, y)
-        return self.gridSearch.best_estimator_
+        self.gridSearchCV = GridSearchCV(rfc, self.grid_param, cv=self.cv, scoring=self.scoring_function)
+        self.gridSearchCV.fit(X, y)
+        return self.gridSearchCV.best_estimator_
     
 class PredictInterview(object):
-    def __init__(self):
+    def __init__(self, use_koalas=True):
         '''
         This class is to predict the probability of a candidate attending scheduled interviews.
         '''
+        self.use_koalas = use_koalas
         self.dataset_file_name = 'Interview_Attendance_Data.csv'
         self.feature_names = ['Date of Interview', 
                        'Client name', 
@@ -315,14 +387,22 @@ class PredictInterview(object):
                        'Are you clear with the venue details and the landmark.',
                        'Has the call letter been shared', 'Marital Status']
         
-        self.drop_feature_names = [
-                        'Name(Cand ID)',
-                        'Date of Interview', 
-                        '_c22',
-                        '_c23',
-                        '_c24',
-                        '_c25',
-                        '_c26']
+        if self.use_koalas:
+            self.drop_feature_names = [
+                'Name(Cand ID)',
+                'Date of Interview', 
+                '_c22',
+                '_c23',
+                '_c24',
+                '_c25',
+                '_c26']
+        else: # use Pandas
+            self.drop_feature_names = [
+                'Unnamed: 22',
+                'Unnamed: 23',
+                'Unnamed: 24',
+                'Unnamed: 25',
+                'Unnamed: 26']
         
         self.dataset = None
         self.rfc     = None
@@ -353,8 +433,11 @@ class PredictInterview(object):
             path = os.path.join(path, self.dataset_file_name)
         else:
             path = self.dataset_file_name
-            
-        dataset = ks.read_csv(path)  
+         
+        if self.use_koalas:
+            dataset = ks.read_csv(path)  
+        else:
+            dataset = pd.read_csv(path)
         
         # shuffle data 
         self.dataset = dataset.sample(frac=1.0) 
@@ -367,7 +450,10 @@ class PredictInterview(object):
         '''
             
         y = self.dataset['Observed Attendance']      # extract labels y
-        X = self.dataset.drop('Observed Attendance') # extract features X
+        if self.use_koalas:
+            X = self.dataset.drop('Observed Attendance') # extract features X
+        else:
+            X = self.dataset.drop(['Observed Attendance'], axis=1) 
         
         self.oneHotEncoder = OneHotEncodeData()
         
@@ -384,9 +470,12 @@ class PredictInterview(object):
         # fill up missing labels and then change labels to uppercase
         y = y.fillna('NaN')
         
-        func = lambda x: x.strip().upper()
-        
-        y_uppercase = transformColumn(y, func, str) 
+        if self.use_koalas:
+            func = lambda x: x.strip().upper()
+            y_uppercase = transformColumn(y, func, str) 
+        else:
+            y_uppercase = map(lambda x: x.strip().upper(), y.values)
+            y_uppercase = pd.Series(y_uppercase)
         
         # separate labeled records from unlabeled records
         self.X_train_encoded = X_1hot[y_uppercase != 'NAN']
@@ -398,9 +487,12 @@ class PredictInterview(object):
         y_train = y_uppercase.loc[y_uppercase != 'NAN']
         
         # encode labels as follows: 0 - NO, 1 - YES, NAN - NAN
-        func = lambda x: 1 if x == 'YES' else 0
-        
-        y = transformColumn(y_train, func, int)
+        if self.use_koalas:
+            func = lambda x: 1 if x == 'YES' else 0
+            y = transformColumn(y_train, func, int)
+        else:
+            y = map(lambda x: 1 if x == 'YES' else 0, y_train)
+            y = pd.Series(y)
         
         self.y_train_encoded = y
         
@@ -413,8 +505,13 @@ class PredictInterview(object):
         '''
         This method triggers data preprocsssing and split dataset into training and testing datasets.
         '''
-        X_train_encoded = self.X_train_encoded.to_numpy()
-        y_train_encoded = self.y_train_encoded.to_numpy()
+        if self.use_koalas:
+            X_train_encoded = self.X_train_encoded.to_numpy()
+            y_train_encoded = self.y_train_encoded.to_numpy()
+        else:
+            X_train_encoded = self.X_train_encoded.values
+            y_train_encoded = self.y_train_encoded.values
+            
         self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(X_train_encoded, 
                                                                                 y_train_encoded, 
                                                                                 test_size = 0.25, random_state = 0)
@@ -511,7 +608,11 @@ class PredictInterview(object):
             print("  R2: {}".format(r2_score))
             print("Accuracy Score: {}".format(accuracy_score))
             print("  f1: {}".format(f1_score))
+            
+            best_params = self.gridSearch.gridSearchCV.best_params_ 
 
+            mlflow.log_param("n_estimators", best_params["n_estimators"])
+            mlflow.log_param("max_depth", best_params["max_depth"])
             mlflow.log_metric("rmse", rmse_score)
             mlflow.log_metric("r2", r2_score)
             mlflow.log_metric("mae", mae_score)
@@ -519,6 +620,7 @@ class PredictInterview(object):
             mlflow.log_metric("f1", f1_score)
 
             mlflow.sklearn.log_model(self.rfc, "random_forest_model")
+            
             
 if __name__ == "__main__":
     predictInterview = PredictInterview()
@@ -539,5 +641,32 @@ if __name__ == "__main__":
     
     print('output interview_prediction.csv ...')
     result_df.to_csv('interview_prediction.csv')
+    
+    #
+    # start model Web service
+    # Note that the model unique universal ID b6e8b1936c44400bb973a13cc40a9b8f needs to be modified to match your case
+    #
+    mlflow models serve -m /Users/yuhuang/yuefeng/machine-learning-spark/mlruns/0/b6e8b1936c44400bb973a13cc40a9b8f/artifacts/random_forest_model -p 1234
+    
+    #
+    # call model Web service
+    #
+    headers = {'Content-Type': 'application/json',
+           'Format': 'pandas-split'}
+    headers_json_str = json.dumps(headers)
+    headers_json_obj = json.loads(headers_json_str)
+    
+    url = 'http://127.0.0.1:1234/invocations'
+    
+    columns = predictInterview.X_train_encoded.columns
+    data1 = predictInterview.X_test[1]
+    test_df1 = pd.DataFrame(data1.reshape((1,-1)))
+    test_df1.columns = columns
+    test_df = test_df1.loc[:2]
+    data_json_obj = test_df.to_json(orient='split')
+    
+    print('call model Web service ...')
+    response = requests.post(url, data=data_json_obj, headers = headers_json_obj)
+    print('intervice attendance: ', response.text)
     
     print('all done')
